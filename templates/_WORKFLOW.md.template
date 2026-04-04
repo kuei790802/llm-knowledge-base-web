@@ -1,0 +1,66 @@
+# Compile & Lint Workflow — {{DOMAIN}} Domain
+
+> This file defines Claude's behavior for `compile {{DOMAIN}}` and `lint {{DOMAIN}}`.
+
+---
+
+## Source Material
+
+| Role | Path |
+|------|------|
+| Raw material | `{{DOMAIN}}/raw/` |
+
+---
+
+## Article Quality Standard
+
+Each wiki article must have:
+
+1. **Frontmatter**
+   ```yaml
+   ---
+   type: wiki-article
+   date: YYYY-MM-DD
+   tags: [{{domain_lowercase}}]
+   status: seedling | growing | evergreen
+   source: "[source title or URL]"
+   ---
+   ```
+
+2. **Summary callout**
+   ```
+   > [!summary]
+   > One or two sentences explaining this article's core insight.
+   ```
+
+3. **Backlinks**
+   ```
+   ## Related
+   - [[Related Article]]
+   ```
+
+---
+
+## Compile Rules
+
+- Duplicate content → merge into existing article
+- New concept → create new article
+- Low-value / too short → skip with reason
+- Update `_index.md` after every compile
+
+---
+
+## Lint Rules
+
+| Rule | Action |
+|------|--------|
+| Missing frontmatter fields | Flag for completion |
+| `seedling` older than 30 days | Flag for review |
+| Concept mentioned 3+ times, no dedicated article | Mark as gap |
+
+---
+
+## Q&A Filing
+
+- Storage path: `{{DOMAIN}}/wiki/qa/`
+- Filename format: `YYYY-MM-DD-[topic-slug].md`

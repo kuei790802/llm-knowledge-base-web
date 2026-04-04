@@ -1,0 +1,69 @@
+# Claude Note — Vault Instructions
+
+This file tells Claude how to operate this Obsidian vault as an LLM-powered knowledge base.
+
+---
+
+## Vault Layout
+
+```
+YOUR_VAULT/
+├── CLAUDE.md                    ← this file
+├── DOMAIN_NAME/
+│   ├── raw/                     ← drop unprocessed source material here
+│   └── wiki/                    ← LLM-maintained knowledge base
+│       ├── _index.md            ← auto-maintained master index
+│       ├── _WORKFLOW.md         ← compile/lint rules for this domain
+│       └── qa/                  ← Q&A outputs
+```
+
+---
+
+## Knowledge Base Commands
+
+### `compile [domain]`
+
+Compile raw source material into the wiki for a given domain.
+
+Steps:
+1. Read `[domain]/wiki/_WORKFLOW.md` — get domain-specific rules
+2. Identify raw source files (location defined in `_WORKFLOW.md`)
+3. For each raw file, decide: new article / update existing / skip (with reason)
+4. Write/update articles in `[domain]/wiki/`
+5. Update `[domain]/wiki/_index.md`
+6. Report: what was created, updated, skipped, and why
+
+### `qa [domain]: [question]`
+
+Answer a question using the domain's wiki as the knowledge base.
+
+Steps:
+1. Read `[domain]/wiki/_index.md` — identify relevant articles
+2. Read those articles
+3. Answer the question with explicit citations (`[[Article Name]]`)
+4. Ask: "要把這份回答存到 wiki/qa/ 嗎？" — if yes, save to `[domain]/wiki/qa/YYYY-MM-DD-[slug].md`
+
+### `lint [domain]`
+
+Run a health check on the domain's wiki.
+
+Steps:
+1. Read `[domain]/wiki/_WORKFLOW.md`
+2. Read `[domain]/wiki/_index.md`
+3. Sample 5–10 wiki articles
+4. Report:
+   - Orphaned concepts (mentioned 3+ times, no dedicated article)
+   - Broken backlinks
+   - Articles with `status: seedling` older than 30 days
+   - Missing required frontmatter fields
+   - Suggested new article candidates
+
+---
+
+## Hard Rules
+
+- **Never modify `Claude Memory/`** during compile / qa / lint operations
+- **Never modify `_index.md` manually** — it is auto-maintained by compile
+- **`wiki/` is Claude's domain** — the user does not write wiki articles directly
+- **`_WORKFLOW.md` is the single source of truth** for domain-specific behavior
+- **Q&A filing is opt-in** — always ask before saving to `wiki/qa/`

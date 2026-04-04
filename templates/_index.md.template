@@ -1,0 +1,31 @@
+---
+type: kb-index
+domain: {{DOMAIN}}
+last_compiled: {{DATE}}
+article_count: 0
+---
+
+# {{DOMAIN}} Knowledge Base Index
+> Auto-maintained by Claude. Do not edit manually.
+
+## Domain Summary
+[2-3 sentences: what this domain covers, current completeness]
+
+## Concept Glossary
+| Concept | Definition | Primary Article |
+|---------|------------|-----------------|
+
+## Article Registry
+| Article | One-line Summary | Status | Last Updated |
+|---------|-----------------|--------|--------------|
+
+## Concept Connection Map
+[Concept A → Related Concept B, C]
+
+## Open Gaps
+[Concepts mentioned multiple times but without dedicated articles]
+
+## Compile History
+| Date | Action | Notes |
+|------|--------|-------|
+| {{DATE}} | Domain initialized | Empty vault |
