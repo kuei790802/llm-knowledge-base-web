@@ -36,6 +36,36 @@ export default function WikiPanel({ domain }: Props) {
     refreshTree()
   }, [refreshTree])
 
+  // Wiki file watcher — auto-refresh on changes
+  useEffect(() => {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const ws = new WebSocket(`${proto}//${window.location.host}/ws/wiki-watch`)
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data)
+        if (msg.type === 'files-changed') {
+          refreshTree()
+          // If viewing an article, reload it too
+          if (selectedPath) {
+            reloadCurrentArticle()
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
+    return () => ws.close()
+  }, [refreshTree, selectedPath])
+
+  async function reloadCurrentArticle() {
+    if (!selectedPath) return
+    try {
+      const res = await fetch(`/api/wiki/file?path=${encodeURIComponent(selectedPath)}`)
+      const data = await res.json()
+      setContent(data.content || '')
+    } catch { /* ignore */ }
+  }
+
   async function selectFile(node: TreeNode) {
     setSelectedPath(node.path)
     setSelectedName(node.name.replace(/\.md$/, ''))

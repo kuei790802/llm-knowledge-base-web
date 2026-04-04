@@ -7,7 +7,6 @@ function required(key: string): string {
 }
 
 export const config = {
-  anthropicApiKey: required('ANTHROPIC_API_KEY'),
   vaultPath: required('VAULT_PATH'),
   defaultDomain: process.env.DEFAULT_DOMAIN || '',
   accessToken: process.env.ACCESS_TOKEN || '',

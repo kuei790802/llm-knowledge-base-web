@@ -1,27 +1,35 @@
 {
   "name": "llm-knowledge-base-web",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --hostname 0.0.0.0 -p 3000",
+    "dev": "tsx watch server.ts",
     "build": "next build",
-    "start": "next start --hostname 0.0.0.0 -p 3000",
-    "lint": "next lint",
-    "dev:tunnel": "concurrently \"npm run dev\" \"cloudflared tunnel --url http://localhost:3000\""
+    "start": "tsx server.ts",
+    "dev:tunnel": "concurrently \"tsx watch server.ts\" \"cloudflared tunnel --url http://localhost:3000\"",
+    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper 2>/dev/null || true"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.82.0",
     "@tailwindcss/typography": "^0.5.19",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
+    "chokidar": "^5.0.0",
     "concurrently": "^9.2.1",
+    "dotenv": "^17.4.0",
     "marked": "^17.0.5",
     "next": "14.2.35",
+    "node-pty": "^1.1.0",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "tsx": "^4.21.0",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/ws": "^8.18.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
