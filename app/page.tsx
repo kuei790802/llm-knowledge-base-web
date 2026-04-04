@@ -7,9 +7,11 @@ import StatusBar from '@/components/StatusBar'
 import NewDomainModal from '@/components/NewDomainModal'
 
 const DEFAULT_DOMAIN = process.env.NEXT_PUBLIC_DEFAULT_DOMAIN || 'Anthropic'
+const DEFAULT_PROVIDER = process.env.NEXT_PUBLIC_CLI_PROVIDER || 'claude'
 
 export default function HomePage() {
   const [domain, setDomain] = useState(DEFAULT_DOMAIN)
+  const [provider, setProvider] = useState(DEFAULT_PROVIDER)
   const [showNewDomain, setShowNewDomain] = useState(false)
   const [mobileView, setMobileView] = useState<'chat' | 'wiki'>('chat')
 
@@ -24,6 +26,8 @@ export default function HomePage() {
         domain={domain}
         onDomainChange={setDomain}
         onNewDomain={() => setShowNewDomain(true)}
+        provider={provider}
+        onProviderChange={setProvider}
       />
 
       {/* Mobile tab toggle */}
@@ -46,7 +50,7 @@ export default function HomePage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Terminal — left on desktop, conditional on mobile */}
         <div className={`${mobileView === 'chat' ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-1/2 border-r border-gray-200`}>
-          <TerminalPanel domain={domain} />
+          <TerminalPanel domain={domain} provider={provider} />
         </div>
 
         {/* Wiki — right on desktop, conditional on mobile */}

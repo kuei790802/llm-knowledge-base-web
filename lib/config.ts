@@ -11,6 +11,7 @@ export const config = {
   defaultDomain: process.env.DEFAULT_DOMAIN || '',
   accessToken: process.env.ACCESS_TOKEN || '',
   port: parseInt(process.env.PORT || '3000', 10),
+  cliProvider: process.env.CLI_PROVIDER || 'claude',
 }
 
 export function resolveVaultPath(...parts: string[]): string {

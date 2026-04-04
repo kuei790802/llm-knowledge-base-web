@@ -8,10 +8,11 @@ import '@xterm/xterm/css/xterm.css'
 
 interface Props {
   domain: string
+  provider: string
   accessToken?: string
 }
 
-export default function TerminalPanel({ domain, accessToken }: Props) {
+export default function TerminalPanel({ domain, provider, accessToken }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -83,14 +84,18 @@ export default function TerminalPanel({ domain, accessToken }: Props) {
     wsRef.current = ws
 
     ws.onopen = () => {
-      setConnected(true)
       setExited(false)
       exitedRef.current = false
       reconnectCountRef.current = 0
-      // Send size after terminal has had a chance to fit
+      // Send init message with provider and terminal size
       requestAnimationFrame(() => {
         fitAddon.fit()
-        sendResize(ws, term)
+        ws.send(JSON.stringify({
+          type: 'init',
+          provider,
+          cols: term.cols,
+          rows: term.rows,
+        }))
       })
     }
 
@@ -102,10 +107,14 @@ export default function TerminalPanel({ domain, accessToken }: Props) {
         // Text frame: control message
         try {
           const msg = JSON.parse(event.data as string)
-          if (msg.type === 'process-exit') {
+          if (msg.type === 'ready') {
+            setConnected(true)
+          } else if (msg.type === 'process-exit') {
             exitedRef.current = true
             setExited(true)
-            term.write(`\r\n\x1b[33m[Claude exited with code ${msg.code}]\x1b[0m\r\n`)
+            term.write(`\r\n\x1b[33m[Process exited with code ${msg.code}]\x1b[0m\r\n`)
+          } else if (msg.type === 'error') {
+            term.write(`\r\n\x1b[31m[Error: ${msg.message}]\x1b[0m\r\n`)
           }
         } catch {
           term.write(event.data as string)
@@ -144,11 +153,17 @@ export default function TerminalPanel({ domain, accessToken }: Props) {
       inputDisposable.dispose()
       resizeObserver.disconnect()
     }
-  }, [accessToken])
+  }, [accessToken, provider])
 
-  // Mount/unmount
+  // Connect/reconnect when provider changes
   useEffect(() => {
     let mounted = true
+    // Close existing connection before starting new one
+    if (wsRef.current) {
+      wsRef.current.close()
+      wsRef.current = null
+    }
+    setConnected(false)
     let cleanup: (() => void) | undefined
     cleanup = connectWs()
 
@@ -157,7 +172,6 @@ export default function TerminalPanel({ domain, accessToken }: Props) {
       cleanup?.()
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
       // Only close WS and dispose terminal on real unmount (not Strict Mode fake unmount)
-      // We detect real unmount by checking if mounted stayed false after a tick
       setTimeout(() => {
         if (!mounted) {
           wsRef.current?.close()
@@ -166,7 +180,7 @@ export default function TerminalPanel({ domain, accessToken }: Props) {
         }
       }, 0)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [provider]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function sendCommand(cmd: string) {
     const ws = wsRef.current

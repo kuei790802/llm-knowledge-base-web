@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import CLISelector from './CLISelector'
 
 interface HealthData {
   vault: { path: string; accessible: boolean; claudeMdExists: boolean }
@@ -11,9 +12,11 @@ interface Props {
   domain: string
   onDomainChange: (d: string) => void
   onNewDomain: () => void
+  provider: string
+  onProviderChange: (id: string) => void
 }
 
-export default function StatusBar({ domain, onDomainChange, onNewDomain }: Props) {
+export default function StatusBar({ domain, onDomainChange, onNewDomain, provider, onProviderChange }: Props) {
   const [health, setHealth] = useState<HealthData | null>(null)
   const [error, setError] = useState(false)
 
@@ -36,6 +39,9 @@ export default function StatusBar({ domain, onDomainChange, onNewDomain }: Props
           {health.vault.path}
         </span>
       )}
+
+      {/* CLI selector */}
+      <CLISelector provider={provider} onProviderChange={onProviderChange} />
 
       {/* Domain selector */}
       <div className="flex items-center gap-1 ml-auto">

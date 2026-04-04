@@ -2,11 +2,11 @@ import 'dotenv/config'
 import { createServer, IncomingMessage } from 'http'
 import { parse } from 'url'
 import path from 'path'
-import { execSync } from 'child_process'
 import next from 'next'
 import { WebSocketServer, WebSocket } from 'ws'
 import * as pty from 'node-pty'
 import chokidar from 'chokidar'
+import { getProvider, resolveCommand } from './lib/cli-providers'
 
 // ── Config ──────────────────────────────────────────────────────────
 const dev = process.env.NODE_ENV !== 'production'
@@ -62,84 +62,100 @@ app.prepare().then(() => {
       return
     }
 
-    // Kill any previous session
-    killActiveSession()
-    activeWs = ws
-
-    // Default terminal size; client sends resize on connect
-    let cols = 120
-    let rows = 40
-
-    // Resolve claude CLI path (node-pty's posix_spawnp may not find it in PATH)
-    let claudePath = process.env.CLAUDE_PATH || ''
-    if (!claudePath) {
+    // Wait for init message from client: { type: 'init', provider: string, cols, rows }
+    ws.once('message', (data: Buffer | string) => {
+      let init: { type: string; provider: string; cols: number; rows: number }
       try {
-        claudePath = execSync('which claude', { encoding: 'utf-8' }).trim()
+        init = JSON.parse(data.toString())
+        if (init.type !== 'init') throw new Error('Expected init message')
       } catch {
-        claudePath = 'claude'  // fallback
+        ws.close(4002, 'Expected init message')
+        return
       }
-    }
-    console.log(`[terminal] Using claude at: ${claudePath}`)
 
-    const ptyProcess = pty.spawn(claudePath, [], {
-      name: 'xterm-256color',
-      cols,
-      rows,
-      cwd: VAULT_PATH,
-      env: process.env as Record<string, string>,
-    })
-    activePty = ptyProcess
+      // Kill any previous session
+      killActiveSession()
+      activeWs = ws
 
-    console.log(`[terminal] claude started (pid ${ptyProcess.pid}), cwd: ${VAULT_PATH}`)
+      const providerId = init.provider || 'claude'
+      const cols = init.cols || 120
+      const rows = init.rows || 40
 
-    // PTY → WebSocket (binary frames)
-    ptyProcess.onData((data: string) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(Buffer.from(data, 'utf-8'), { binary: true })
+      let provider
+      try {
+        provider = getProvider(providerId)
+      } catch {
+        ws.send(JSON.stringify({ type: 'error', message: `Unknown provider: ${providerId}` }))
+        ws.close(4003, 'Unknown provider')
+        return
       }
-    })
 
-    // PTY exit → notify client
-    ptyProcess.onExit(({ exitCode }) => {
-      console.log(`[terminal] claude exited (code ${exitCode})`)
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'process-exit', code: exitCode }))
-      }
-      activePty = null
-    })
+      const cmdPath = resolveCommand(provider.command)
+      console.log(`[terminal] Using ${provider.name} at: ${cmdPath}`)
 
-    // WebSocket → PTY
-    // IMPORTANT: In the ws library, data is always Buffer regardless of text/binary frame.
-    // Use the isBinary flag (not Buffer.isBuffer) to distinguish.
-    ws.on('message', (data: Buffer | string, isBinary: boolean) => {
-      if (isBinary) {
-        // Binary frame = terminal keyboard input
-        ptyProcess.write(data.toString())
-      } else {
-        // Text frame = JSON control message
-        try {
-          const msg = JSON.parse(data.toString())
-          if (msg.type === 'resize' && msg.cols && msg.rows) {
-            ptyProcess.resize(Math.max(1, msg.cols), Math.max(1, msg.rows))
-          }
-        } catch {
-          // Fallback: treat as terminal input
-          ptyProcess.write(data.toString())
+      const ptyProcess = pty.spawn(cmdPath, provider.getSpawnArgs(), {
+        name: 'xterm-256color',
+        cols,
+        rows,
+        cwd: VAULT_PATH,
+        env: { ...process.env as Record<string, string>, ...provider.getEnv() },
+      })
+      activePty = ptyProcess
+
+      console.log(`[terminal] ${provider.name} started (pid ${ptyProcess.pid}), cwd: ${VAULT_PATH}`)
+
+      // Notify client that PTY is ready
+      ws.send(JSON.stringify({ type: 'ready', provider: providerId }))
+
+      // PTY → WebSocket (binary frames)
+      ptyProcess.onData((data: string) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(Buffer.from(data, 'utf-8'), { binary: true })
         }
-      }
-    })
+      })
 
-    ws.on('close', () => {
-      console.log('[terminal] WebSocket closed')
-      if (activePty === ptyProcess) {
-        try { ptyProcess.kill() } catch { /* ok */ }
+      // PTY exit → notify client
+      ptyProcess.onExit(({ exitCode }) => {
+        console.log(`[terminal] ${provider.name} exited (code ${exitCode})`)
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'process-exit', code: exitCode }))
+        }
         activePty = null
-        activeWs = null
-      }
-    })
+      })
 
-    ws.on('error', (err) => {
-      console.error('[terminal] WebSocket error:', err.message)
+      // WebSocket → PTY
+      // IMPORTANT: In the ws library, data is always Buffer regardless of text/binary frame.
+      // Use the isBinary flag (not Buffer.isBuffer) to distinguish.
+      ws.on('message', (rawData: Buffer | string, isBinary: boolean) => {
+        if (isBinary) {
+          // Binary frame = terminal keyboard input
+          ptyProcess.write(rawData.toString())
+        } else {
+          // Text frame = JSON control message
+          try {
+            const msg = JSON.parse(rawData.toString())
+            if (msg.type === 'resize' && msg.cols && msg.rows) {
+              ptyProcess.resize(Math.max(1, msg.cols), Math.max(1, msg.rows))
+            }
+          } catch {
+            // Fallback: treat as terminal input
+            ptyProcess.write(rawData.toString())
+          }
+        }
+      })
+
+      ws.on('close', () => {
+        console.log('[terminal] WebSocket closed')
+        if (activePty === ptyProcess) {
+          try { ptyProcess.kill() } catch { /* ok */ }
+          activePty = null
+          activeWs = null
+        }
+      })
+
+      ws.on('error', (err) => {
+        console.error('[terminal] WebSocket error:', err.message)
+      })
     })
   })
 
