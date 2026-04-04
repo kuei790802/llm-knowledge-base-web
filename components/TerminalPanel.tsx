@@ -124,7 +124,9 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
 
     ws.onclose = () => {
       setConnected(false)
-      // Only auto-reconnect if claude didn't intentionally exit
+      // Only auto-reconnect if this is still the active connection
+      // (prevents stale reconnect when switching providers)
+      if (wsRef.current !== ws) return
       if (!exitedRef.current && reconnectCountRef.current < maxReconnects) {
         reconnectCountRef.current++
         term.write(`\r\n\x1b[33m[Disconnected. Reconnecting (${reconnectCountRef.current}/${maxReconnects})...]\x1b[0m\r\n`)
@@ -156,31 +158,45 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
   }, [accessToken, provider])
 
   // Connect/reconnect when provider changes
+  const isFirstMount = useRef(true)
   useEffect(() => {
-    let mounted = true
     // Close existing connection before starting new one
     if (wsRef.current) {
       wsRef.current.close()
       wsRef.current = null
     }
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current)
+      reconnectTimerRef.current = null
+    }
     setConnected(false)
-    let cleanup: (() => void) | undefined
-    cleanup = connectWs()
+
+    // Clear terminal on provider switch (not on first mount)
+    if (!isFirstMount.current && termRef.current) {
+      termRef.current.clear()
+      termRef.current.write(`\x1b[36m[Switching to ${provider}...]\x1b[0m\r\n`)
+    }
+    isFirstMount.current = false
+
+    const cleanup = connectWs()
 
     return () => {
-      mounted = false
       cleanup?.()
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
-      // Only close WS and dispose terminal on real unmount (not Strict Mode fake unmount)
-      setTimeout(() => {
-        if (!mounted) {
-          wsRef.current?.close()
-          termRef.current?.dispose()
-          termRef.current = null
-        }
-      }, 0)
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
+      }
     }
   }, [provider]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Dispose terminal on unmount
+  useEffect(() => {
+    return () => {
+      wsRef.current?.close()
+      termRef.current?.dispose()
+      termRef.current = null
+    }
+  }, [])
 
   function sendCommand(cmd: string) {
     const ws = wsRef.current
