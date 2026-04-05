@@ -2,31 +2,13 @@ import fs from 'fs/promises'
 import path from 'path'
 import { config } from './config'
 
-// Domain → wiki root path mapping (mirrors CLAUDE.md domain shorthand)
+// Domain → wiki root path mapping
 export function domainToWikiPath(domain: string): string {
-  const map: Record<string, string> = {
-    'claude-api': path.join(config.vaultPath, 'Anthropic', 'wiki'),
-    'anthropic': path.join(config.vaultPath, 'Anthropic', 'wiki'),
-    'pmp': path.join(config.vaultPath, 'PMP', 'wiki'),
-    '加密貨幣': path.join(config.vaultPath, '加密貨幣', 'wiki'),
-    'crypto': path.join(config.vaultPath, '加密貨幣', 'wiki'),
-    '保險bot': path.join(config.vaultPath, '保險Bot專案', 'wiki'),
-  }
-  const key = domain.toLowerCase()
-  return map[key] || path.join(config.vaultPath, domain, 'wiki')
+  return path.join(config.vaultPath, domain, 'wiki')
 }
 
 export function domainToRawPath(domain: string): string {
-  const map: Record<string, string> = {
-    'claude-api': path.join(config.vaultPath, 'Anthropic', '00-Inbox'),
-    'anthropic': path.join(config.vaultPath, 'Anthropic', '00-Inbox'),
-    'pmp': path.join(config.vaultPath, 'PMP', 'raw'),
-    '加密貨幣': path.join(config.vaultPath, '加密貨幣', 'raw'),
-    'crypto': path.join(config.vaultPath, '加密貨幣', 'raw'),
-    '保險bot': path.join(config.vaultPath, '保險Bot專案', 'raw'),
-  }
-  const key = domain.toLowerCase()
-  return map[key] || path.join(config.vaultPath, domain, 'raw')
+  return path.join(config.vaultPath, domain, 'raw')
 }
 
 // Security: ensure filePath is inside allowedRoot (prevent path traversal)
