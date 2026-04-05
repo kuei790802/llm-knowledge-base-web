@@ -25,9 +25,12 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
   const [connected, setConnected] = useState(false)
   const [exited, setExited] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
-  const [qaMode, setQaMode] = useState(false)
-  const [qaInput, setQaInput] = useState('')
+  const [input, setInput] = useState('')
+  const [advancedMode, setAdvancedMode] = useState(false)
+  const advancedModeRef = useRef(false)
+  const isComposingRef = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const chatInputRef = useRef<HTMLInputElement>(null)
 
   // Send resize to server (debounced via requestAnimationFrame)
   const pendingResizeRef = useRef<number | null>(null)
@@ -57,10 +60,10 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
         theme: {
           background: '#1a1b26',
           foreground: '#c0caf5',
-          cursor: '#c0caf5',
+          cursor: '#1a1b26',  // hidden by default (matches background)
           selectionBackground: '#33467c',
         },
-        cursorBlink: true,
+        cursorBlink: false,
       })
       const fitAddon = new FitAddon()
       term.loadAddon(fitAddon)
@@ -134,9 +137,9 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
       }
     }
 
-    // Terminal keyboard input → WebSocket as binary frame
+    // Terminal keyboard input → WebSocket (only in advanced mode)
     const inputDisposable = term.onData((data: string) => {
-      if (ws.readyState === WebSocket.OPEN) {
+      if (advancedModeRef.current && ws.readyState === WebSocket.OPEN) {
         ws.send(new TextEncoder().encode(data))
       }
     })
@@ -205,11 +208,32 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
     }
   }
 
+  // Send text then Enter separately so CLI treats Enter as "submit", not "paste newline"
+  function submitToTerminal(text: string) {
+    sendCommand(text)
+    setTimeout(() => sendCommand('\r'), 50)
+  }
+
   function handleReconnect() {
     exitedRef.current = false
     reconnectCountRef.current = 0
     setExited(false)
     connectWs()
+  }
+
+  function toggleAdvancedMode() {
+    const next = !advancedModeRef.current
+    advancedModeRef.current = next
+    setAdvancedMode(next)
+    if (termRef.current) {
+      termRef.current.options.cursorBlink = next
+      termRef.current.options.theme = {
+        ...termRef.current.options.theme,
+        cursor: next ? '#c0caf5' : '#1a1b26',
+      }
+    }
+    if (next) termRef.current?.focus()
+    else chatInputRef.current?.focus()
   }
 
   async function handleFileUpload(file: File) {
@@ -241,24 +265,18 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
       {/* Command bar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50 flex-wrap">
         <button
-          onClick={() => sendCommand(`compile ${domain}\n`)}
+          onClick={() => submitToTerminal(`compile ${domain}`)}
           disabled={!connected}
           className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Compile
         </button>
         <button
-          onClick={() => sendCommand(`lint ${domain}\n`)}
+          onClick={() => submitToTerminal(`lint ${domain}`)}
           disabled={!connected}
           className="px-3 py-1 bg-amber-500 text-white text-sm rounded hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Lint
-        </button>
-        <button
-          onClick={() => setQaMode(!qaMode)}
-          className={`px-3 py-1 text-sm rounded ${qaMode ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-        >
-          Q&A {qaMode ? '(ON)' : '(OFF)'}
         </button>
         <button
           onClick={() => fileInputRef.current?.click()}
@@ -278,32 +296,6 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
         </span>
       </div>
 
-      {/* Q&A input bar */}
-      {qaMode && (
-        <div className="flex gap-2 px-3 py-2 bg-purple-50 border-b border-purple-200">
-          <input
-            type="text"
-            value={qaInput}
-            onChange={e => setQaInput(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && qaInput.trim()) {
-                sendCommand(`qa ${domain}: ${qaInput}\n`)
-                setQaInput('')
-              }
-            }}
-            placeholder="Type your question..."
-            className="flex-1 border border-purple-300 rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-          />
-          <button
-            onClick={() => { if (qaInput.trim()) { sendCommand(`qa ${domain}: ${qaInput}\n`); setQaInput('') } }}
-            disabled={!qaInput.trim() || !connected}
-            className="px-4 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:opacity-50"
-          >
-            Ask
-          </button>
-        </div>
-      )}
-
       {/* Terminal container */}
       <div className="flex-1 relative bg-[#1a1b26] overflow-hidden">
         <div ref={containerRef} className="absolute inset-0 p-1" />
@@ -322,6 +314,44 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
             </div>
           </div>
         )}
+
+        {/* Advanced mode toggle */}
+        <button
+          onClick={toggleAdvancedMode}
+          className={`absolute bottom-2 right-2 z-10 px-2 py-1 text-xs rounded opacity-60 hover:opacity-100 transition-opacity ${
+            advancedMode ? 'bg-amber-500 text-white' : 'bg-gray-700 text-gray-300'
+          }`}
+        >
+          🔧 Terminal{advancedMode ? ' (ON)' : ''}
+        </button>
+      </div>
+
+      {/* Chat input bar */}
+      <div className="flex gap-2 px-3 py-2 border-t border-gray-700 bg-gray-900">
+        <input
+          ref={chatInputRef}
+          type="text"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onCompositionStart={() => { isComposingRef.current = true }}
+          onCompositionEnd={() => { isComposingRef.current = false }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !isComposingRef.current && input.trim() && connected) {
+              submitToTerminal(input)
+              setInput('')
+            }
+          }}
+          placeholder="輸入指令或問題... / Type a command or question..."
+          className="flex-1 bg-gray-800 text-gray-100 rounded px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+          disabled={!connected}
+        />
+        <button
+          onClick={() => { if (input.trim() && connected) { submitToTerminal(input); setInput('') } }}
+          disabled={!input.trim() || !connected}
+          className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Send
+        </button>
       </div>
     </div>
   )
