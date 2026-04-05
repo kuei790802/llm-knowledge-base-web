@@ -12,6 +12,31 @@ info() { echo -e "    $1"; }
 # Bilingual: print zh then en indented
 msg() { echo -e "  ${CYAN}$1${NC}"; echo -e "  $2"; }
 
+# Spinner: run a command silently in background, show animated progress
+# Usage: run_with_spinner "message" command [args...]
+# On failure, dumps captured output to stderr.
+run_with_spinner() {
+  local display_msg="$1"; shift
+  local log="/tmp/llm-kb-setup-$$.log"
+  "$@" >"$log" 2>&1 &
+  local pid=$!
+  local sp='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+  local i=0
+  while kill -0 "$pid" 2>/dev/null; do
+    printf "\r  ${CYAN}${sp:$((i % ${#sp})):1}${NC} $display_msg"
+    i=$(( i + 1 ))
+    sleep 0.1
+  done
+  wait "$pid"
+  local code=$?
+  printf "\r\033[K"  # clear spinner line
+  if [ $code -ne 0 ]; then
+    cat "$log" >&2
+  fi
+  rm -f "$log"
+  return $code
+}
+
 # ── Trap for clean exit on Ctrl+C ────────────────────────────────────
 trap 'echo ""; warn "安裝中斷 / Setup interrupted."; exit 1' INT
 
@@ -130,9 +155,9 @@ if command -v node &>/dev/null; then
 fi
 
 if [ "$NODE_OK" = false ]; then
-  msg "正在安裝 Node.js..." "Installing Node.js via Homebrew..."
+  msg "正在安裝 Node.js..." "Installing Node.js via Homebrew (約 2-3 分鐘 / ~2-3 min)..."
   if command -v brew &>/dev/null; then
-    brew install node
+    run_with_spinner "Node.js 安裝中，請稍候… / Installing Node.js, please wait…" brew install node
     ok "Node.js $(node -v) 安裝完成 / installed"
   else
     err "無法安裝 Node.js / Cannot install Node.js automatically."
@@ -159,8 +184,12 @@ else
   read -r -p "  要安裝 Obsidian 嗎？/ Install Obsidian? [Y/n]: " INSTALL_OBS
   INSTALL_OBS="${INSTALL_OBS:-Y}"
   if [[ "$INSTALL_OBS" =~ ^[Yy]$ ]]; then
-    msg "正在安裝 Obsidian..." "Installing Obsidian..."
-    brew install --cask obsidian && ok "Obsidian 安裝完成 / installed" || warn "安裝失敗，請手動從 https://obsidian.md 下載 / Install failed, download from https://obsidian.md"
+    msg "正在安裝 Obsidian（約 1-2 分鐘）..." "Installing Obsidian (~1-2 min)..."
+    if run_with_spinner "Obsidian 安裝中，請稍候… / Installing Obsidian, please wait…" brew install --cask obsidian; then
+      ok "Obsidian 安裝完成 / installed"
+    else
+      warn "安裝失敗，請手動從 https://obsidian.md 下載 / Install failed, download from https://obsidian.md"
+    fi
   else
     info "跳過 / Skipped. 你可以用 VS Code 或任何 Markdown 編輯器開啟知識庫資料夾。"
     info "You can open the knowledge base folder with VS Code or any Markdown editor."
@@ -180,15 +209,18 @@ install_cli_if_missing() {
     AVAILABLE_CLIS+=("$cmd")
     return
   fi
-  msg "正在安裝 $name..." "Installing $name..."
-  if npm install -g "$pkg" 2>&1; then
+  msg "正在安裝 $name（約 1 分鐘）..." "Installing $name (~1 min)..."
+  if run_with_spinner "$name 安裝中，請稍候… / Installing $name, please wait…" npm install -g "$pkg"; then
     ok "$name 安裝完成 / installed"
     AVAILABLE_CLIS+=("$cmd")
-  elif npm install -g "$pkg" 2>&1 | grep -q 'EACCES'; then
-    warn "權限不足，嘗試 sudo / Permission denied, retrying with sudo..."
-    sudo npm install -g "$pkg" && ok "$name 安裝完成 (sudo) / installed" && AVAILABLE_CLIS+=("$cmd") || err "$name 安裝失敗 / install failed"
   else
-    err "$name 安裝失敗 / install failed"
+    warn "權限不足，嘗試 sudo / Permission denied, retrying with sudo..."
+    if sudo npm install -g "$pkg"; then
+      ok "$name 安裝完成 (sudo) / installed"
+      AVAILABLE_CLIS+=("$cmd")
+    else
+      err "$name 安裝失敗 / install failed"
+    fi
   fi
 }
 
@@ -296,7 +328,9 @@ done
 # ── Step 4: npm install ───────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}[4/6] 安裝專案套件 / Installing project dependencies${NC}"
-npm install
+msg "首次安裝約 1-2 分鐘，之後重複執行會很快。" \
+    "First install takes ~1-2 min; subsequent runs are much faster."
+run_with_spinner "npm install 執行中，請稍候… / Running npm install, please wait…" npm install
 # Ensure node-pty spawn-helper is executable (postinstall may have set it, verify)
 chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper 2>/dev/null || true
 ok "套件安裝完成 / Dependencies installed"
