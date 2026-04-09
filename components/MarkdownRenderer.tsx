@@ -10,12 +10,10 @@ interface Props {
 // Convert Obsidian [[wikilinks]] to spans (read-only, no navigation yet)
 function preprocessObsidian(md: string): string {
   return md
-    // [[link|alias]] or [[link]]
     .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, link, alias) => {
       const label = alias || link
       return `<span class="wikilink" title="${link}">${label}</span>`
     })
-    // Obsidian callouts: > [!type] → styled blockquote
     .replace(/^> \[!(\w+)\]\s*\n((?:>.*\n?)*)/gm, (_, type, body) => {
       const text = body.replace(/^> ?/gm, '').trim()
       return `<blockquote class="callout callout-${type.toLowerCase()}"><strong>[${type}]</strong><br>${text}</blockquote>\n`
@@ -30,7 +28,30 @@ export default function MarkdownRenderer({ content }: Props) {
 
   return (
     <div
-      className="prose prose-sm max-w-none prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-code:text-pink-600 prose-code:bg-pink-50 prose-code:px-1 prose-code:rounded [&_.wikilink]:text-blue-600 [&_.wikilink]:underline [&_.wikilink]:cursor-pointer [&_.callout]:border-l-4 [&_.callout]:border-blue-400 [&_.callout]:bg-blue-50 [&_.callout]:p-3 [&_.callout]:my-2 [&_.callout-warning]:border-yellow-400 [&_.callout-warning]:bg-yellow-50 [&_.callout-danger]:border-red-400 [&_.callout-danger]:bg-red-50 [&_.callout-summary]:border-green-400 [&_.callout-summary]:bg-green-50"
+      className={[
+        'prose prose-sm dark:prose-invert max-w-none',
+        // Headings
+        'prose-headings:text-foreground',
+        // Code blocks
+        'prose-pre:bg-muted prose-pre:text-foreground prose-pre:border prose-pre:border-border',
+        // Inline code
+        'prose-code:text-pink-600 dark:prose-code:text-pink-400',
+        'prose-code:bg-pink-50 dark:prose-code:bg-pink-950/30',
+        'prose-code:px-1 prose-code:rounded prose-code:before:content-none prose-code:after:content-none',
+        // Links
+        'prose-a:text-primary',
+        // Wikilinks
+        '[&_.wikilink]:text-primary [&_.wikilink]:underline [&_.wikilink]:underline-offset-2 [&_.wikilink]:cursor-pointer',
+        // Callouts
+        '[&_.callout]:border-l-4 [&_.callout]:rounded-r [&_.callout]:border-primary/40 [&_.callout]:bg-primary/5 [&_.callout]:p-3 [&_.callout]:my-3 [&_.callout]:not-italic',
+        '[&_.callout-warning]:border-amber-400 [&_.callout-warning]:bg-amber-50 dark:[&_.callout-warning]:bg-amber-950/20',
+        '[&_.callout-danger]:border-red-400 [&_.callout-danger]:bg-red-50 dark:[&_.callout-danger]:bg-red-950/20',
+        '[&_.callout-summary]:border-green-400 [&_.callout-summary]:bg-green-50 dark:[&_.callout-summary]:bg-green-950/20',
+        // Tables
+        'prose-th:text-foreground prose-td:text-foreground/80',
+        // HR
+        'prose-hr:border-border',
+      ].join(' ')}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   )

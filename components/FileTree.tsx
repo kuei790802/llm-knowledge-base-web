@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { ChevronRight, Folder, FileText } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { TreeNode } from '@/lib/vault'
 
 interface Props {
@@ -19,13 +21,16 @@ function NodeItem({ node, onSelect, selectedPath, depth = 0 }: { node: TreeNode;
     return (
       <div>
         <button
-          className="flex items-center gap-1 w-full text-left px-2 py-0.5 hover:bg-gray-100 rounded text-sm text-gray-700 font-medium"
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
+          className="flex items-center gap-1.5 w-full text-left px-2 py-1 hover:bg-accent rounded-sm text-sm text-foreground"
+          style={{ paddingLeft: `${depth * 14 + 8}px` }}
           onClick={() => setExpanded(!expanded)}
         >
-          <span className="text-gray-400 text-xs">{expanded ? '▾' : '▸'}</span>
-          <span className="text-gray-500 text-xs mr-1">📁</span>
-          {node.name}
+          <ChevronRight className={cn(
+            "h-3 w-3 text-muted-foreground transition-transform shrink-0",
+            expanded && "rotate-90"
+          )} />
+          <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="truncate">{node.name}</span>
         </button>
         {expanded && node.children && (
           <div>
@@ -44,17 +49,20 @@ function NodeItem({ node, onSelect, selectedPath, depth = 0 }: { node: TreeNode;
     )
   }
 
-  if (!isMd) return null  // Only show markdown files
+  if (!isMd) return null
 
   return (
     <button
-      className={`flex items-center gap-1 w-full text-left px-2 py-0.5 rounded text-sm ${
-        isSelected ? 'bg-blue-100 text-blue-800' : 'hover:bg-gray-100 text-gray-600'
-      }`}
-      style={{ paddingLeft: `${depth * 12 + 8}px` }}
+      className={cn(
+        "flex items-center gap-1.5 w-full text-left px-2 py-1 rounded-sm text-sm transition-colors",
+        isSelected
+          ? "bg-primary/10 text-primary font-medium"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+      )}
+      style={{ paddingLeft: `${depth * 14 + 8}px` }}
       onClick={() => onSelect(node)}
     >
-      <span className="text-gray-400 text-xs mr-1">📄</span>
+      <FileText className="h-3.5 w-3.5 shrink-0" />
       <span className="truncate">{node.name.replace(/\.md$/, '')}</span>
     </button>
   )
@@ -62,11 +70,11 @@ function NodeItem({ node, onSelect, selectedPath, depth = 0 }: { node: TreeNode;
 
 export default function FileTree({ nodes, onSelect, selectedPath, depth = 0 }: Props) {
   if (nodes.length === 0) {
-    return <p className="text-xs text-gray-400 px-2 py-1">No files found</p>
+    return <p className="text-xs text-muted-foreground px-3 py-2">No files found</p>
   }
 
   return (
-    <div>
+    <div className="space-y-0.5">
       {nodes.map(node => (
         <NodeItem
           key={node.path}

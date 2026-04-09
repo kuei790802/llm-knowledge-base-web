@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { cn } from '@/lib/utils'
+import { Separator } from '@/components/ui/separator'
 import TerminalPanel from '@/components/TerminalPanel'
 import WikiPanel from '@/components/WikiPanel'
 import StatusBar from '@/components/StatusBar'
@@ -21,7 +23,7 @@ export default function HomePage() {
   }, [])
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-background">
       <StatusBar
         domain={domain}
         onDomainChange={setDomain}
@@ -31,16 +33,26 @@ export default function HomePage() {
       />
 
       {/* Mobile tab toggle */}
-      <div className="md:hidden flex border-b border-gray-200 bg-white">
+      <div className="md:hidden flex border-b">
         <button
           onClick={() => setMobileView('chat')}
-          className={`flex-1 py-2 text-sm font-medium ${mobileView === 'chat' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
+          className={cn(
+            "flex-1 py-2 text-sm font-medium border-b-2 transition-colors",
+            mobileView === 'chat'
+              ? "text-primary border-primary"
+              : "text-muted-foreground border-transparent hover:text-foreground"
+          )}
         >
           Terminal
         </button>
         <button
           onClick={() => setMobileView('wiki')}
-          className={`flex-1 py-2 text-sm font-medium ${mobileView === 'wiki' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
+          className={cn(
+            "flex-1 py-2 text-sm font-medium border-b-2 transition-colors",
+            mobileView === 'wiki'
+              ? "text-primary border-primary"
+              : "text-muted-foreground border-transparent hover:text-foreground"
+          )}
         >
           Wiki
         </button>
@@ -48,13 +60,21 @@ export default function HomePage() {
 
       {/* Main split view */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Terminal — left on desktop, conditional on mobile */}
-        <div className={`${mobileView === 'chat' ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-1/2 border-r border-gray-200`}>
+        {/* Terminal — left panel */}
+        <div className={cn(
+          "flex-col w-full md:w-1/2 bg-[hsl(var(--panel-left))]",
+          mobileView === 'chat' ? 'flex' : 'hidden md:flex'
+        )}>
           <TerminalPanel domain={domain} provider={provider} />
         </div>
 
-        {/* Wiki — right on desktop, conditional on mobile */}
-        <div className={`${mobileView === 'wiki' ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-1/2 bg-white`}>
+        <Separator orientation="vertical" className="hidden md:block" />
+
+        {/* Wiki — right panel */}
+        <div className={cn(
+          "flex-col w-full md:w-1/2 bg-[hsl(var(--panel-right))]",
+          mobileView === 'wiki' ? 'flex' : 'hidden md:flex'
+        )}>
           <WikiPanel domain={domain} />
         </div>
       </div>

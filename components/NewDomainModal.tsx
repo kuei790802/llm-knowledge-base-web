@@ -1,6 +1,17 @@
 'use client'
 
 import { useState } from 'react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 
 interface Props {
   onClose: () => void
@@ -37,57 +48,51 @@ export default function NewDomainModal({ onClose, onCreated }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">New Knowledge Domain</h2>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>New Knowledge Domain</DialogTitle>
+        </DialogHeader>
 
-        <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Domain Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="domain-name">
+              Domain Name <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="domain-name"
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="e.g. Cryptography, Machine Learning"
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               autoFocus
+              onKeyDown={e => { if (e.key === 'Enter' && name.trim()) handleCreate() }}
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description (optional)
-            </label>
-            <textarea
+          <div className="space-y-2">
+            <Label htmlFor="domain-desc">Description (optional)</Label>
+            <Textarea
+              id="domain-desc"
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="What knowledge goes in this domain?"
               rows={3}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+              className="resize-none"
             />
           </div>
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
 
-        <div className="flex justify-end gap-2 mt-5">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-          >
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={!name.trim() || creating}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          </Button>
+          <Button onClick={handleCreate} disabled={!name.trim() || creating}>
             {creating ? 'Creating...' : 'Create Domain'}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

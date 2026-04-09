@@ -1,6 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
+import { ChevronDown, Check, Circle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface ProviderStatus {
   id: string
@@ -18,8 +26,6 @@ interface Props {
 
 export default function CLISelector({ provider, onProviderChange }: Props) {
   const [providers, setProviders] = useState<ProviderStatus[]>([])
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetch('/api/cli')
@@ -28,70 +34,44 @@ export default function CLISelector({ provider, onProviderChange }: Props) {
       .catch(() => {})
   }, [])
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
-
   const current = providers.find(p => p.id === provider)
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-700 text-gray-200 rounded text-xs hover:bg-gray-600"
-      >
-        <span className="text-gray-500">CLI:</span>
-        <span>{current?.name || provider}</span>
-        <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute top-full left-0 mt-1 w-72 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-50 py-1">
-          {providers.map(p => (
-            <button
-              key={p.id}
-              onClick={() => {
-                if (p.installed) {
-                  onProviderChange(p.id)
-                  setOpen(false)
-                }
-              }}
-              className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-700 ${
-                p.id === provider ? 'bg-gray-700' : ''
-              } ${!p.installed ? 'opacity-60' : ''}`}
-            >
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground">
+          <span className="opacity-60">CLI:</span>
+          <span>{current?.name || provider}</span>
+          <ChevronDown className="h-3 w-3 opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-72">
+        {providers.map(p => (
+          <DropdownMenuItem
+            key={p.id}
+            onClick={() => p.installed && onProviderChange(p.id)}
+            disabled={!p.installed}
+          >
+            <div className="flex-1">
               <div className="flex items-center gap-2">
-                <span className={p.installed ? 'text-green-400' : 'text-gray-500'}>
-                  {p.installed ? '●' : '○'}
-                </span>
-                <span className="text-gray-200 font-medium">{p.name}</span>
-                {p.id === provider && (
-                  <span className="ml-auto text-blue-400 text-[10px]">active</span>
-                )}
+                <Circle className={`h-2 w-2 fill-current ${p.installed ? 'text-green-500' : 'text-muted-foreground/40'}`} />
+                <span className="font-medium">{p.name}</span>
+                {p.id === provider && <Check className="ml-auto h-3.5 w-3.5 text-primary" />}
               </div>
               {!p.installed && (
-                <div className="ml-5 mt-1 text-gray-500">
-                  Install: <code className="text-gray-400">{p.installInstructions}</code>
-                </div>
+                <p className="ml-4 mt-0.5 text-[11px] text-muted-foreground">
+                  Install: <code className="text-xs">{p.installInstructions}</code>
+                </p>
               )}
               {p.installed && !p.authenticated && (
-                <div className="ml-5 mt-1 text-yellow-500/70">
+                <p className="ml-4 mt-0.5 text-[11px] text-amber-500">
                   {p.authInstructions}
-                </div>
+                </p>
               )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+            </div>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

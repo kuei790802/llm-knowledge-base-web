@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { ChevronLeft, RotateCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import FileTree from './FileTree'
 import MarkdownRenderer from './MarkdownRenderer'
 import type { TreeNode } from '@/lib/vault'
@@ -46,7 +48,6 @@ export default function WikiPanel({ domain }: Props) {
         const msg = JSON.parse(event.data)
         if (msg.type === 'files-changed') {
           refreshTree()
-          // If viewing an article, reload it too
           if (selectedPath) {
             reloadCurrentArticle()
           }
@@ -83,30 +84,34 @@ export default function WikiPanel({ domain }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-white border-l border-gray-200">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 bg-gray-50">
+      <div className="flex items-center justify-between px-3 py-2 border-b bg-[hsl(var(--panel-header))]">
         <div className="flex items-center gap-2">
           {view === 'article' && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
               onClick={() => setView('tree')}
-              className="text-gray-400 hover:text-gray-600 text-xs"
               title="Back to file tree"
             >
-              ◀
-            </button>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
           )}
-          <span className="text-sm font-medium text-gray-700">
+          <span className="text-sm font-medium text-foreground">
             {view === 'tree' ? `Wiki — ${domain}` : selectedName}
           </span>
         </div>
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
           onClick={refreshTree}
-          className="text-xs text-gray-400 hover:text-gray-600"
           title="Refresh"
         >
-          ↻
-        </button>
+          <RotateCw className="h-3.5 w-3.5" />
+        </Button>
       </div>
 
       {/* Content */}
@@ -114,7 +119,7 @@ export default function WikiPanel({ domain }: Props) {
         {view === 'tree' ? (
           <div className="py-2">
             {treeLoading ? (
-              <p className="text-xs text-gray-400 px-3">Loading...</p>
+              <p className="text-xs text-muted-foreground px-3 py-2">Loading...</p>
             ) : (
               <FileTree
                 nodes={tree}
@@ -126,7 +131,7 @@ export default function WikiPanel({ domain }: Props) {
         ) : (
           <div className="p-4">
             {loading ? (
-              <p className="text-sm text-gray-400">Loading...</p>
+              <p className="text-sm text-muted-foreground">Loading...</p>
             ) : (
               <MarkdownRenderer content={content} />
             )}

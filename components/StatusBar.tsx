@@ -1,7 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { Activity, FolderOpen, Plus } from 'lucide-react'
 import CLISelector from './CLISelector'
+import { ThemeToggle } from './theme-toggle'
+import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface HealthData {
   vault: { path: string; accessible: boolean; claudeMdExists: boolean }
@@ -28,42 +38,45 @@ export default function StatusBar({ domain, onDomainChange, onNewDomain, provide
   }, [])
 
   return (
-    <div className="flex items-center gap-3 px-4 py-1.5 bg-gray-800 text-gray-300 text-xs border-b border-gray-700">
+    <div className="flex items-center gap-3 px-4 py-1.5 bg-[hsl(var(--panel-header))] text-sm border-b">
       {/* Vault status */}
-      <span className={health?.vault.accessible ? 'text-green-400' : 'text-red-400'}>
-        ● {health?.vault.accessible ? 'Vault OK' : error ? 'Vault unreachable' : '...'}
-      </span>
+      <div className="flex items-center gap-1.5 text-xs">
+        <Activity className={`h-3 w-3 ${health?.vault.accessible ? 'text-green-500' : 'text-destructive'}`} />
+        <span className="text-muted-foreground">
+          {health?.vault.accessible ? 'Vault OK' : error ? 'Unreachable' : '...'}
+        </span>
+      </div>
 
       {health?.vault.path && (
-        <span className="text-gray-500 truncate max-w-[200px]" title={health.vault.path}>
+        <span className="hidden sm:inline text-xs text-muted-foreground/50 truncate max-w-[200px]" title={health.vault.path}>
           {health.vault.path}
         </span>
       )}
 
-      {/* CLI selector */}
       <CLISelector provider={provider} onProviderChange={onProviderChange} />
 
+      <div className="flex-1" />
+
       {/* Domain selector */}
-      <div className="flex items-center gap-1 ml-auto">
-        <span className="text-gray-500">Domain:</span>
-        <select
-          value={domain}
-          onChange={e => onDomainChange(e.target.value)}
-          className="bg-gray-700 text-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none"
-        >
-          {health?.domains.map(d => (
-            <option key={d} value={d}>{d}</option>
-          ))}
-          {(!health?.domains.length) && <option value={domain}>{domain}</option>}
-        </select>
-        <button
-          onClick={onNewDomain}
-          className="px-2 py-0.5 bg-gray-600 text-gray-200 rounded hover:bg-gray-500 text-xs ml-1"
-          title="Add new domain"
-        >
-          + New
-        </button>
+      <div className="flex items-center gap-1.5">
+        <FolderOpen className="h-3 w-3 text-muted-foreground" />
+        <Select value={domain} onValueChange={onDomainChange}>
+          <SelectTrigger className="h-7 w-auto min-w-[100px] text-xs border-0 bg-transparent shadow-none focus:ring-0 px-2">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {health?.domains.map(d => (
+              <SelectItem key={d} value={d} className="text-xs">{d}</SelectItem>
+            ))}
+            {(!health?.domains.length) && <SelectItem value={domain} className="text-xs">{domain}</SelectItem>}
+          </SelectContent>
+        </Select>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onNewDomain} title="Add new domain">
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
       </div>
+
+      <ThemeToggle />
     </div>
   )
 }
