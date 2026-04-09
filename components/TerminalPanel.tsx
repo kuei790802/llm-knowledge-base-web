@@ -5,6 +5,26 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
+import { Send, Upload, Play, Search, Terminal as TerminalIcon, RefreshCw } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+
+// Terminal always uses a dark theme — CLI tools emit hardcoded RGB colors
+// designed for dark backgrounds (24-bit true color), so a light terminal
+// would render their output invisible. Same approach as VS Code's terminal.
+const TERM_THEME = {
+  background: '#1a1b26',
+  foreground: '#c0caf5',
+  cursor: '#1a1b26',        // hidden by default (matches background)
+  cursorAccent: '#c0caf5',  // visible when advanced mode is on
+  selectionBackground: '#33467c',
+  black: '#414868', red: '#f7768e', green: '#9ece6a', yellow: '#e0af68',
+  blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#7dcfff', white: '#c0caf5',
+  brightBlack: '#565f89', brightRed: '#f7768e', brightGreen: '#9ece6a',
+  brightYellow: '#e0af68', brightBlue: '#7aa2f7', brightMagenta: '#bb9af7',
+  brightCyan: '#7dcfff', brightWhite: '#c0caf5',
+}
 
 interface Props {
   domain: string
@@ -19,7 +39,7 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectCountRef = useRef(0)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const exitedRef = useRef(false)   // use ref to avoid stale closure in callbacks
+  const exitedRef = useRef(false)
   const maxReconnects = 3
 
   const [connected, setConnected] = useState(false)
@@ -57,19 +77,13 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
         fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", Menlo, monospace',
         fontSize: 13,
         lineHeight: 1.2,
-        theme: {
-          background: '#1a1b26',
-          foreground: '#c0caf5',
-          cursor: '#1a1b26',  // hidden by default (matches background)
-          selectionBackground: '#33467c',
-        },
+        theme: TERM_THEME,
         cursorBlink: false,
       })
       const fitAddon = new FitAddon()
       term.loadAddon(fitAddon)
       term.loadAddon(new WebLinksAddon())
       term.open(containerRef.current)
-      // Defer initial fit so the container has rendered dimensions
       requestAnimationFrame(() => fitAddon.fit())
       termRef.current = term
       fitAddonRef.current = fitAddon
@@ -90,7 +104,6 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
       setExited(false)
       exitedRef.current = false
       reconnectCountRef.current = 0
-      // Send init message with provider and terminal size
       requestAnimationFrame(() => {
         fitAddon.fit()
         ws.send(JSON.stringify({
@@ -104,10 +117,8 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
 
     ws.onmessage = (event) => {
       if (event.data instanceof ArrayBuffer) {
-        // Binary frame: PTY output
         term.write(new Uint8Array(event.data))
       } else {
-        // Text frame: control message
         try {
           const msg = JSON.parse(event.data as string)
           if (msg.type === 'ready') {
@@ -127,8 +138,6 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
 
     ws.onclose = () => {
       setConnected(false)
-      // Only auto-reconnect if this is still the active connection
-      // (prevents stale reconnect when switching providers)
       if (wsRef.current !== ws) return
       if (!exitedRef.current && reconnectCountRef.current < maxReconnects) {
         reconnectCountRef.current++
@@ -137,14 +146,14 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
       }
     }
 
-    // Terminal keyboard input → WebSocket (only in advanced mode)
+    // Terminal keyboard input -> WebSocket (only in advanced mode)
     const inputDisposable = term.onData((data: string) => {
       if (advancedModeRef.current && ws.readyState === WebSocket.OPEN) {
         ws.send(new TextEncoder().encode(data))
       }
     })
 
-    // Resize observer — debounced via sendResize
+    // Resize observer
     const resizeObserver = new ResizeObserver(() => {
       fitAddon.fit()
       sendResize(ws, term)
@@ -153,7 +162,6 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
       resizeObserver.observe(containerRef.current)
     }
 
-    // Cleanup for this connection
     return () => {
       inputDisposable.dispose()
       resizeObserver.disconnect()
@@ -163,7 +171,6 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
   // Connect/reconnect when provider changes
   const isFirstMount = useRef(true)
   useEffect(() => {
-    // Close existing connection before starting new one
     if (wsRef.current) {
       wsRef.current.close()
       wsRef.current = null
@@ -174,7 +181,6 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
     }
     setConnected(false)
 
-    // Clear terminal on provider switch (not on first mount)
     if (!isFirstMount.current && termRef.current) {
       termRef.current.clear()
       termRef.current.write(`\x1b[36m[Switching to ${provider}...]\x1b[0m\r\n`)
@@ -208,7 +214,7 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
     }
   }
 
-  // Send text then Enter separately so CLI treats Enter as "submit", not "paste newline"
+  // Send text then Enter separately so CLI treats Enter as "submit"
   function submitToTerminal(text: string) {
     sendCommand(text)
     setTimeout(() => sendCommand('\r'), 50)
@@ -229,7 +235,7 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
       termRef.current.options.cursorBlink = next
       termRef.current.options.theme = {
         ...termRef.current.options.theme,
-        cursor: next ? '#c0caf5' : '#1a1b26',
+        cursor: next ? TERM_THEME.cursorAccent : TERM_THEME.background,
       }
     }
     if (next) termRef.current?.focus()
@@ -263,72 +269,85 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
       onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f) }}
     >
       {/* Command bar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50 flex-wrap">
-        <button
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b bg-[hsl(var(--panel-header))] flex-wrap">
+        <Button
           onClick={() => submitToTerminal(`compile ${domain}`)}
           disabled={!connected}
-          className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          size="sm"
+          className="h-7 text-xs"
         >
+          <Play className="h-3 w-3" />
           Compile
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => submitToTerminal(`lint ${domain}`)}
           disabled={!connected}
-          className="px-3 py-1 bg-amber-500 text-white text-sm rounded hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          size="sm"
+          variant="secondary"
+          className="h-7 text-xs"
         >
+          <Search className="h-3 w-3" />
           Lint
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploadingFile}
-          className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300 disabled:opacity-50"
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs"
         >
+          <Upload className="h-3 w-3" />
           {uploadingFile ? 'Uploading...' : 'Upload'}
-        </button>
+        </Button>
         <input
           ref={fileInputRef}
           type="file"
           className="hidden"
           onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }}
         />
-        <span className={`ml-auto text-xs ${connected ? 'text-green-600' : 'text-red-500'}`}>
-          {connected ? '● Connected' : '○ Disconnected'}
-        </span>
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-green-500' : 'bg-destructive'}`} />
+          <span className="text-xs text-muted-foreground">
+            {connected ? 'Connected' : 'Disconnected'}
+          </span>
+        </div>
       </div>
 
-      {/* Terminal container */}
+      {/* Terminal container — always dark (CLI tools use hardcoded RGB for dark bg) */}
       <div className="flex-1 relative bg-[#1a1b26] overflow-hidden">
         <div ref={containerRef} className="absolute inset-0 p-1" />
 
         {/* Session ended overlay */}
         {exited && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm z-10">
             <div className="text-center">
-              <p className="text-gray-300 mb-3">Session ended.</p>
-              <button
-                onClick={handleReconnect}
-                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
+              <p className="text-muted-foreground mb-3 text-sm">Session ended.</p>
+              <Button onClick={handleReconnect} size="sm">
+                <RefreshCw className="h-3.5 w-3.5" />
                 Reconnect
-              </button>
+              </Button>
             </div>
           </div>
         )}
 
         {/* Advanced mode toggle */}
-        <button
+        <Button
           onClick={toggleAdvancedMode}
-          className={`absolute bottom-2 right-2 z-10 px-2 py-1 text-xs rounded opacity-60 hover:opacity-100 transition-opacity ${
-            advancedMode ? 'bg-amber-500 text-white' : 'bg-gray-700 text-gray-300'
-          }`}
+          size="sm"
+          variant={advancedMode ? 'default' : 'ghost'}
+          className={cn(
+            "absolute bottom-2 right-2 z-10 h-6 text-[11px] opacity-60 hover:opacity-100 transition-opacity",
+            !advancedMode && "bg-muted/80 text-muted-foreground hover:bg-muted hover:text-foreground"
+          )}
         >
-          🔧 Terminal{advancedMode ? ' (ON)' : ''}
-        </button>
+          <TerminalIcon className="h-3 w-3" />
+          Terminal{advancedMode ? ' ON' : ''}
+        </Button>
       </div>
 
       {/* Chat input bar */}
-      <div className="flex gap-2 px-3 py-2 border-t border-gray-700 bg-gray-900">
-        <input
+      <div className="flex gap-2 px-3 py-2 border-t bg-muted/30">
+        <Input
           ref={chatInputRef}
           type="text"
           value={input}
@@ -342,16 +361,17 @@ export default function TerminalPanel({ domain, provider, accessToken }: Props) 
             }
           }}
           placeholder="輸入指令或問題... / Type a command or question..."
-          className="flex-1 bg-gray-800 text-gray-100 rounded px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+          className="flex-1 h-9 text-sm"
           disabled={!connected}
         />
-        <button
+        <Button
           onClick={() => { if (input.trim() && connected) { submitToTerminal(input); setInput('') } }}
           disabled={!input.trim() || !connected}
-          className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          size="icon"
+          className="h-9 w-9 shrink-0"
         >
-          Send
-        </button>
+          <Send className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   )
